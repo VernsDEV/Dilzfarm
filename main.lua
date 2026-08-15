@@ -26,7 +26,7 @@ local Config = {
     ["IsOwned_Bike"] = "...";
     ["AutoFarm"] = {
         ["Running"] = false;
-        ["MovementType"] = "Teleport Mode"; -- Defaulting to TP mode for this script
+        ["MovementType"] = "Teleport Mode"; 
         ["Marshmallow"] = {
             ["Enabled"] = false;
             ["BatchAmount"] = 1;
@@ -44,8 +44,8 @@ local Config = {
 }
 
 -- // 3. LOAD SYDE LIBRARY
--- NOTE: Since your repo is private, this URL will 404. 
--- PASTE THE RAW SOURCE OF ui.lua INTO THE STRING BELOW IF IT FAILS.
+-- NOTE: Since your repo is private, this URL will 404 unless authenticated.
+-- If it fails, paste the raw source of ui.lua into a string and use: local Syde = loadstring(SOURCE_CODE)()
 local LibSource = game:HttpGet("https://raw.githubusercontent.com/VernsDEV/Dilzfarm/refs/heads/main/ui.lua")
 local Syde = loadstring(LibSource)()
 
@@ -66,8 +66,8 @@ local Window = Syde:Init({
     Home = { Enabled = false } -- Skip home page, go straight to tabs
 })
 
--- Create FARM Tab (Using correct Syde API: InitTab)
-local FarmTab = Window:InitTab({
+-- Create FARM Tab (Using correct Syde API: Tab)
+local FarmTab = Window:Tab({
     Title = "FARM"
 })
 
@@ -80,7 +80,8 @@ local function CustomTeleport(targetCFrame)
     local maxAttempts = 5
     
     for i = 1, maxAttempts do
-        if not Config["AutoFarm"]["Marshmallow"]["Enabled"] then return false end
+        -- Break if farm is disabled during test
+        if not Config["AutoFarm"]["Marshmallow"]["Enabled"] and i > 1 then return false end
         
         -- STEP A: TP TO VOID (9e9)
         hrp.CFrame = CFrame.new(0, 9e9, 0)
@@ -105,7 +106,7 @@ local function CustomTeleport(targetCFrame)
     return false
 end
 
--- // 5. MARSHMALLOW FARM LOGIC
+-- // 5. MARSHMALLOW FARM LOGIC (SELLING ONLY - COOKING DISABLED)
 local MarshmallowFarm_Thread = nil
 local MarshmallowSellPrices = {
     ["Small Marshmallow Bag"]  = 1470;
@@ -164,10 +165,12 @@ local function StartMarshmallowFarm()
                 end
             else
                 -- ==========================================
-                -- INSERT BUYING/COOKING LOGIC HERE
-                -- (When backpack is empty, buy ingredients & cook)
+                -- COOKING LOGIC DISABLED AS REQUESTED
+                -- Previously: Buy ingredients -> Cook -> Collect
+                -- Now: Just waits for manual restock or external cooking
                 -- ==========================================
-                task.wait(1)
+                Syde:Notify({Title = "Farm Idle", Content = "No marshmallows found. Cooking disabled.", Duration = 3})
+                task.wait(5)
             end
             
             task.wait(0.5)
@@ -184,12 +187,12 @@ local function StopMarshmallowFarm()
     end
 end
 
--- // 6. UI ELEMENTS (Strictly using Syde API)
+-- // 6. UI ELEMENTS (Strictly using Syde API from Pasted_Text)
 
 -- Toggle: Auto Farm
 FarmTab:Toggle({
     Title = "Marshmallow Auto Farm",
-    Description = "Automatically teleports and sells marshmallows using void TP.",
+    Description = "Automatically teleports and sells marshmallows. (Cooking Disabled)",
     Value = false,
     CallBack = function(State)
         Config["AutoFarm"]["Marshmallow"]["Enabled"] = State
@@ -201,12 +204,13 @@ FarmTab:Toggle({
     end
 })
 
--- Button: Test Teleport (NOW VISIBLE & FUNCTIONAL)
+-- Button: Test Teleport (FIXED: Now uses correct Syde Button API)
 FarmTab:Button({
     Title = "Test Teleport",
     Description = "Manually test the custom 9e9 TP logic to 511.1, 3.6, 601.4",
     CallBack = function()
         task.spawn(function()
+            Syde:Notify({Title = "TP Testing", Content = "Starting 9e9 void check sequence...", Duration = 2})
             local result = CustomTeleport(CFrame.new(511.1, 3.6, 601.4))
             if result then
                 Syde:Notify({Title = "TP Success", Content = "Arrived at destination!", Duration = 3})
