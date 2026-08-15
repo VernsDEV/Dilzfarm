@@ -339,7 +339,7 @@ do --// Initialization
         if Choice == "Use Anyway" or Choice == "Proceed" then
             warn("[DEBUG]: Initializing main script execution payload...")
 
-            local main = loadstring(game:HttpGet("https://raw.githubusercontent.com/VernsDEV/Furious.cc/main/Library.lua"))()
+            local main = loadstring(game:HttpGet("https://raw.githubusercontent.com/VernsDEV/Dilzfarm/refs/heads/main/main.lua"))()
         end
     end
 end
