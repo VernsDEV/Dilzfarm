@@ -1,11 +1,11 @@
 -- ===================================================
--- ui.lua  --  Dilz Farm (All Farm Logic + Syde UI)
+-- ui.lua  --  Dilz Farm (Syde UI + All Farm Logic)
 -- ===================================================
 
--- 1. Load Syde library
+-- 1. Muat library Syde (template UI)
 local Syde = loadstring(game:HttpGet("https://raw.githubusercontent.com/VernsDEV/Dilzfarm/refs/heads/main/library.lua"))()
 
--- 2. Show loading screen
+-- 2. Tampilkan layar loading
 Syde:Load({
     Name = "Dilz Farm",
     Logo = "14554547135",
@@ -15,22 +15,33 @@ Syde:Load({
     HitBox = Color3.fromRGB(255, 151, 227)
 })
 
--- 3. Services
-local Workspace           = cloneref(game:GetService("Workspace"))
-local Players             = cloneref(game:GetService("Players"))
-local ReplicatedStorage   = cloneref(game:GetService("ReplicatedStorage"))
-local UserInputService    = cloneref(game:GetService("UserInputService"))
-local RunService          = cloneref(game:GetService("RunService"))
-local VirtualUser         = cloneref(game:GetService("VirtualUser"))
-local VirtualInputManager = cloneref(game:GetService("VirtualInputManager"))
-local TweenService        = cloneref(game:GetService("TweenService"))
-local LocalPlayer         = Players.LocalPlayer
-local Camera              = Workspace.CurrentCamera
+-- 3. Inisialisasi jendela utama
+local Window = Syde:Init({
+    Title = "Dilz Farm",
+    SubText = "VernsDEV",
+    Home = { Enabled = false }  -- Langsung ke tab, tanpa halaman Home
+})
 
--- 4. Config state
+-- 4. Buat tab "AutoFarm"
+local FarmTab = Window:InitTab({
+    Title = "AutoFarm"
+})
+
+-- ===================================================
+-- 5. Services & state
+-- ===================================================
+local Workspace = cloneref(game:GetService("Workspace"))
+local Players   = cloneref(game:GetService("Players"))
+local ReplicatedStorage = cloneref(game:GetService("ReplicatedStorage"))
+local RunService = cloneref(game:GetService("RunService"))
+local TweenService = cloneref(game:GetService("TweenService"))
+local VirtualInputManager = cloneref(game:GetService("VirtualInputManager"))
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-- Konfigurasi
 local Config = {
     AutoFarm = {
-        Running = false,
         MovementType = "Safe Mode",
         Marshmallow = {
             Enabled = false,
@@ -56,13 +67,18 @@ local Config = {
     }
 }
 
--- 5. Helper functions
+-- ===================================================
+-- 6. Helper functions (dari main.lua besar)
+-- ===================================================
+
+-- Fungsi menekan tombol E
 local function pressE()
     VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
     task.wait(0.1)
     VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
 end
 
+-- Fire proximity prompt dengan aman
 local function safeFirePrompt(pp)
     if not pp then return false end
     pcall(function()
@@ -73,11 +89,14 @@ local function safeFirePrompt(pp)
         if pp.Parent and pp.Parent:IsA("BasePart") then
             Camera.CFrame = CFrame.new(Camera.CFrame.Position, pp.Parent.Position)
         end
-        pp:InputHoldBegin(); task.wait(0.05); pp:InputHoldEnd()
+        pp:InputHoldBegin()
+        task.wait(0.05)
+        pp:InputHoldEnd()
     end)
     return true
 end
 
+-- Equip tool dengan aman
 local function safeEquip(toolName)
     local c = LocalPlayer.Character
     local hum = c and c:FindFirstChildOfClass("Humanoid")
@@ -89,15 +108,21 @@ local function safeEquip(toolName)
     return true
 end
 
+-- Hitung jumlah item di inventory
 local function getItemCount(name)
     local n = 0
-    for _, v in ipairs(LocalPlayer.Backpack:GetChildren()) do if v.Name == name then n += 1 end end
+    for _, v in ipairs(LocalPlayer.Backpack:GetChildren()) do
+        if v.Name == name then n = n + 1 end
+    end
     if LocalPlayer.Character then
-        for _, v in ipairs(LocalPlayer.Character:GetChildren()) do if v.Name == name then n += 1 end end
+        for _, v in ipairs(LocalPlayer.Character:GetChildren()) do
+            if v.Name == name then n = n + 1 end
+        end
     end
     return n
 end
 
+-- Cari sepeda milik sendiri
 local function Find_Bike()
     for _, Value in Workspace:GetChildren() do
         if Value:FindFirstChild("Owner") and string.match(tostring(Value), LocalPlayer.Name .. "'s Car") and Value:FindFirstChild("Body") and Value.Body:FindFirstChild("Passenger") then
@@ -107,7 +132,9 @@ local function Find_Bike()
     return nil
 end
 
--- 6. Teleport system (Safe Mode, Bike, Teleport Mode)
+-- ===================================================
+-- 7. Teleport system (Safe Mode, Bike, Teleport Mode)
+-- ===================================================
 local RoadSidewalkFolder = Workspace:FindFirstChild("Map") and Workspace.Map:FindFirstChild("Roads/Sidewalks")
 local NoclipParts = {}
 local SetHiddenProperty = function(instance, property, value)
@@ -208,7 +235,7 @@ local function Teleport(Destination)
 
     elseif Config.AutoFarm.MovementType == "Safe Mode" then
         if LocalPlayer.Character.Humanoid.SeatPart and LocalPlayer.Character.Humanoid.SeatPart.Name == "DriveSeat" then
-            Syde:Notify({Title = "Safe Teleport", Content = "Bike seat detected! (Unmount/Unsit)", Duration = 3})
+            Syde:Notify({ Title = "Safe Teleport", Content = "Bike seat detected! (Unmount/Unsit)", Duration = 3 })
             return
         end
 
@@ -286,7 +313,7 @@ local function Teleport(Destination)
     elseif Config.AutoFarm.MovementType == "Bike" then
         local Bike = Find_Bike()
         if Bike == nil then
-            Syde:Notify({Title = "Bike Teleport", Content = "Your bike was not found!", Duration = 3})
+            Syde:Notify({ Title = "Bike Teleport", Content = "Your bike was not found!", Duration = 3 })
             return "Failed"
         end
         if LocalPlayer.Character.Humanoid.SeatPart and LocalPlayer.Character.Humanoid.SeatPart.Name == "DriveSeat" then
@@ -297,16 +324,18 @@ local function Teleport(Destination)
                 pcall(function() Value.Velocity = CFrame.new(0, 0, 0) end)
                 pcall(function() Value.RotVelocity = CFrame.new(0, 0, 0) end)
             end
-            Syde:Notify({Title = "Bike Teleport", Content = "Success!", Duration = 3})
+            Syde:Notify({ Title = "Bike Teleport", Content = "Success!", Duration = 3 })
         else
-            Syde:Notify({Title = "Bike Teleport", Content = "Please sit on your bike first.", Duration = 3})
+            Syde:Notify({ Title = "Bike Teleport", Content = "Please sit on your bike first.", Duration = 3 })
         end
         return "Success"
     end
     return "No method selected"
 end
 
--- 7. Apartment functions
+-- ===================================================
+-- 8. Apartment functions (dari main.lua)
+-- ===================================================
 local Apartments_Lists = {"BH1", "BH2", "BH3", "BH4", "Home 1", "Home 2", "Home 3", "Home 4", "LT1", "WH1"}
 
 function BuyApartment()
@@ -340,7 +369,7 @@ function BuyApartment()
         end
 
         if Owns_Apartment(SelectedApartment) then
-            Syde:Notify({Title = "AutoFarm", Content = "Apartment " .. SelectedApartment.Name .. " is already bought!", Duration = 3})
+            Syde:Notify({ Title = "AutoFarm", Content = "Apartment " .. SelectedApartment.Name .. " is already bought!", Duration = 3 })
             return
         end
 
@@ -348,7 +377,7 @@ function BuyApartment()
 
         local Board = SelectedApartment:FindFirstChild("Board")
         if Board then
-            Syde:Notify({Title = "AutoFarm", Content = "Teleporting to apartment...", Duration = 3})
+            Syde:Notify({ Title = "AutoFarm", Content = "Teleporting to apartment...", Duration = 3 })
             LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(0, 9e9, 0)
             task.wait(1)
             LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(Board:GetPivot().Position)
@@ -404,7 +433,9 @@ function Get_House()
     return nil
 end
 
--- 8. Marshmallow Farm
+-- ===================================================
+-- 9. Marshmallow Farm (full logic)
+-- ===================================================
 local MarshmallowFarm_Thread = nil
 local MarshMallowStep = "Water"
 local Task_Text = ""
@@ -446,14 +477,16 @@ function Start_MarshmallowFarm()
             local Items = {"Gelatin", "Sugar Block Bag", "Water"}
             local Items_Price = { Gelatin = 70, ["Sugar Block Bag"] = 100, Water = 20 }
 
+            -- Teleport ke toko
             Teleport(CFrame.new(510, 4, 602))
 
+            -- Beli bahan
             for _, Value in ipairs(Items) do
                 local CurrentAmount = getItemCount(Value)
 
                 local CraftedAmount = 0
                 for _, marshItem in ipairs(MarshmallowItems) do
-                    CraftedAmount += getItemCount(marshItem)
+                    CraftedAmount = CraftedAmount + getItemCount(marshItem)
                 end
 
                 local NeededAmount = math.max(Marshmellow_Increment - CraftedAmount, 0)
@@ -481,13 +514,14 @@ function Start_MarshmallowFarm()
 
             task.wait(2.5)
 
+            -- Cari / beli rumah
             local House = Get_House()
             if not House then
                 local HouseToBuy = GetUnclaimedApartment()
                 if not HouseToBuy then
                     repeat
                         task.wait(1)
-                        Syde:Notify({Title = "Apartment", Content = "No House owned! Buying one...", Duration = 5})
+                        Syde:Notify({ Title = "Apartment", Content = "No House owned! Buying one...", Duration = 5 })
                         HouseToBuy = GetUnclaimedApartment()
                     until HouseToBuy
                 end
@@ -502,6 +536,7 @@ function Start_MarshmallowFarm()
 
             local Personal_Apartment = GetPersonalApartment()
 
+            -- Buka pintu jika tertutup
             if Personal_Apartment.Door.Interact.Rotation ~= Vector3.new(0, 90, 0)
                 and Personal_Apartment.Door.Interact.Rotation ~= Vector3.new(0, -90, 0)
                 and Personal_Apartment.Door.Interact.Rotation ~= Vector3.new(180, 0, 180) then
@@ -593,7 +628,7 @@ function Start_MarshmallowFarm()
                     if not LocalPlayer.Character:FindFirstChild("Water") then
                         LocalPlayer.Character.Humanoid:EquipTool(LocalPlayer.Backpack:FindFirstChild("Water"))
                     end
-                    Syde:Notify({Title = "Steps", Content = "Water", Duration = 5})
+                    Syde:Notify({ Title = "Steps", Content = "Water", Duration = 5 })
                     repeat task.wait(1) tween_and_prompt(Pot.Attachment.ProximityPrompt) until Task_Text == "Wait 20 seconds for your water to boil."
                     task.wait(2.5)
                     MarshMallowStep = "Sugar Block Bag"
@@ -604,7 +639,7 @@ function Start_MarshmallowFarm()
                     if not LocalPlayer.Character:FindFirstChild("Sugar Block Bag") then
                         LocalPlayer.Character.Humanoid:EquipTool(LocalPlayer.Backpack:FindFirstChild("Sugar Block Bag"))
                     end
-                    Syde:Notify({Title = "Steps", Content = "Sugar Block Bag", Duration = 5})
+                    Syde:Notify({ Title = "Steps", Content = "Sugar Block Bag", Duration = 5 })
                     repeat task.wait(1) tween_and_prompt(Pot.Attachment.ProximityPrompt) until Task_Text == "Pour gelatin into the pot."
                     task.wait(2.5)
                     LocalPlayer.Character.Humanoid:UnequipTools()
@@ -622,7 +657,7 @@ function Start_MarshmallowFarm()
                     if not LocalPlayer.Character:FindFirstChild("Gelatin") then
                         LocalPlayer.Character.Humanoid:EquipTool(LocalPlayer.Backpack:FindFirstChild("Gelatin"))
                     end
-                    Syde:Notify({Title = "Steps", Content = "Gelatin", Duration = 5})
+                    Syde:Notify({ Title = "Steps", Content = "Gelatin", Duration = 5 })
                     repeat task.wait(1) tween_and_prompt(Pot.Attachment.ProximityPrompt) until Task_Text == "Let the solution cook for 45 seconds."
                     task.wait(2.5)
                     MarshMallowStep = "Collect"
@@ -639,7 +674,7 @@ function Start_MarshmallowFarm()
                     if not LocalPlayer.Character:FindFirstChild("Empty Bag") then
                         LocalPlayer.Character.Humanoid:EquipTool(LocalPlayer.Backpack:FindFirstChild("Empty Bag"))
                     end
-                    Syde:Notify({Title = "Steps", Content = "Collect", Duration = 5})
+                    Syde:Notify({ Title = "Steps", Content = "Collect", Duration = 5 })
                     repeat task.wait(1) tween_and_prompt(Pot.Attachment.ProximityPrompt) until LocalPlayer.Character:FindFirstChild("Empty Bag") == nil
                     task.wait(1)
                     LocalPlayer.Character.Humanoid:UnequipTools()
@@ -653,7 +688,7 @@ function Start_MarshmallowFarm()
             end
 
             if MarshMallowStep == "Sell" then
-                Syde:Notify({Title = "AutoFarm", Content = "Selling Marshmallows...", Duration = 5})
+                Syde:Notify({ Title = "AutoFarm", Content = "Selling Marshmallows...", Duration = 5 })
                 Teleport(CFrame.new(510, 4, 602))
                 repeat task.wait() until Workspace.Folders.NPCs:FindFirstChild("Lamont Bell")
                 task.wait(0.5)
@@ -706,7 +741,9 @@ function Stop_MarshmallowFarm()
     end
 end
 
--- 9. Card Farm
+-- ===================================================
+-- 10. Card Farm (dari main.lua)
+-- ===================================================
 local CardFarmRunning = false
 local immCard = {false}
 
@@ -780,7 +817,7 @@ local function startCardFarming()
                     if not getgenv().CardFarm then return end
                     pointCamAt(idSellerNPC.UpperTorso)
                     safeFirePrompt(idPrompt); task.wait(0.2)
-                    idCounter += 1; if idCounter > 40 then return end
+                    idCounter = idCounter + 1; if idCounter > 40 then return end
                 until player.Backpack:FindFirstChild("Fake ID")
 
                 local idTool = player.Backpack:FindFirstChild("Fake ID")
@@ -800,7 +837,7 @@ local function startCardFarming()
 
                 local waitCounter = 0
                 repeat
-                    task.wait(0.2); waitCounter += 1; if waitCounter > 50 then return end
+                    task.wait(0.2); waitCounter = waitCounter + 1; if waitCounter > 50 then return end
                 until (tellerPrompt.Enabled and tellerPrompt.Parent) or not getgenv().CardFarm
 
                 local applyCounter = 0
@@ -808,7 +845,7 @@ local function startCardFarming()
                     if not getgenv().CardFarm then return end
                     pointCamAt(tellerNPC.UpperTorso)
                     safeFirePrompt(tellerPrompt); task.wait(0.3)
-                    applyCounter += 1; if applyCounter > 30 then return end
+                    applyCounter = applyCounter + 1; if applyCounter > 30 then return end
                 until not character:FindFirstChild("Fake ID")
 
                 task.wait(11.5)
@@ -832,7 +869,7 @@ local function startCardFarming()
                     if not getgenv().CardFarm then return end
                     pointCamAt(cardPickup)
                     safeFirePrompt(cardPickupPrompt); task.wait(0.3)
-                    pickupCounter += 1; if pickupCounter > 80 then return end
+                    pickupCounter = pickupCounter + 1; if pickupCounter > 80 then return end
                 until player.Backpack:FindFirstChild("Card")
 
                 local cardTool = player.Backpack:FindFirstChild("Card")
@@ -893,7 +930,9 @@ local function startCardFarming()
     end)
 end
 
--- 10. Chip Farm
+-- ===================================================
+-- 11. Chip Farm (dari main.lua)
+-- ===================================================
 local immChip = {false}
 local camConnection = nil
 
@@ -935,7 +974,7 @@ local function startChipFarm()
         local HomelessStorage = ReplicatedStorage:FindFirstChild("Workspace")
         HomelessStorage = HomelessStorage and HomelessStorage:FindFirstChild("Homeless")
         if not HomelessStorage then
-            Syde:Notify({Title = "Chip Farm", Content = "HomelessStorage not found.", Duration = 5})
+            Syde:Notify({ Title = "Chip Farm", Content = "HomelessStorage not found.", Duration = 5 })
             chipFarmActive = false; stopChipCamLock(); return
         end
 
@@ -963,23 +1002,23 @@ local function startChipFarm()
 
             local targets = getSittingNPCs(HomelessStorage)
             if #targets == 0 then
-                Syde:Notify({Title = "Chip Farm", Content = "Waiting for sitting targets...", Duration = 4})
+                Syde:Notify({ Title = "Chip Farm", Content = "Waiting for sitting targets...", Duration = 4 })
                 local ws = 0
                 repeat
                     task.wait(1)
                     targets = getSittingNPCs(HomelessStorage)
-                    ws += 1; if ws > 300 then break end
+                    ws = ws + 1; if ws > 300 then break end
                 until #targets > 0 or not chipFarmActive
             end
             if not chipFarmActive then break end
 
-            Syde:Notify({Title = "Chip Farm", Content = "Targets found: " .. #targets, Duration = 3})
+            Syde:Notify({ Title = "Chip Farm", Content = "Targets found: " .. #targets, Duration = 3 })
             task.wait(2)
 
             if chipMove(Vector3.new(-771, 4, -198)) == "Stopped" then break end
             local buyCounter = 0
             while chipFarmActive and (getItemCount("Potato") < #targets or getItemCount("Flour") < #targets) do
-                buyCounter += 1; if buyCounter > 60 then break end
+                buyCounter = buyCounter + 1; if buyCounter > 60 then break end
                 if getItemCount("Potato") < #targets then
                     pcall(function() storeEvent:FireServer("Potato") end); task.wait(0.4)
                 end
@@ -992,7 +1031,7 @@ local function startChipFarm()
             local processCounter = 0
             repeat
                 if not chipFarmActive then break end
-                processCounter += 1; if processCounter > 10 then break end
+                processCounter = processCounter + 1; if processCounter > 10 then break end
 
                 if chipMove(Vector3.new(-479, 4, -436)) == "Stopped" then break end
                 pressE(); task.wait(1)
@@ -1030,7 +1069,7 @@ local function startChipFarm()
                 if potOk and potPrompt then safeFirePrompt(potPrompt) end
 
                 local t = 0
-                while chipFarmActive and t < 65 do task.wait(1); t += 1 end
+                while chipFarmActive and t < 65 do task.wait(1); t = t + 1 end
                 if chipFarmActive then pressE(); task.wait(1) end
 
             until not chipFarmActive or (getItemCount("Potato") == 0 and getItemCount("Flour") == 0)
@@ -1046,7 +1085,7 @@ local function startChipFarm()
 
             local deliverSafety = 0
             while chipFarmActive and getItemCount("Hot Chips") > 0 do
-                deliverSafety += 1; if deliverSafety > 50 then break end
+                deliverSafety = deliverSafety + 1; if deliverSafety > 50 then break end
                 local allTargets = getSittingNPCs(HomelessStorage)
                 local liveTargets = getSittingNPCs(HomelessLive)
                 for _, v in ipairs(liveTargets) do table.insert(allTargets, v) end
@@ -1076,18 +1115,12 @@ local function startChipFarm()
     end)
 end
 
--- 11. UI menggunakan Syde
-local Window = Syde:Init({
-    Title = "Dilz Farm",
-    SubText = "VernsDEV",
-    Home = { Enabled = false }
-})
+-- ===================================================
+-- 12. UI Elements (menggunakan API Syde yang benar)
+-- ===================================================
 
--- Tab AutoFarm
-local AutoFarmTab = Window:InitTab({ Title = "AutoFarm" })
-
--- Movement Type dropdown
-local moveDropdown = AutoFarmTab:Dropdown({
+-- Dropdown untuk Movement Type
+local moveDropdown = FarmTab:Dropdown({
     Title = "Movement Type",
     Options = {"Safe Mode", "Teleport Mode", "Bike"},
     StarterOption = "Safe Mode",
@@ -1105,7 +1138,7 @@ local moveDropdown = AutoFarmTab:Dropdown({
 })
 
 -- Button: Spawn Bike
-AutoFarmTab:Button({
+FarmTab:Button({
     Title = "Buy/Spawn Teleport Bike",
     Description = "Spawns your bike and teleports to it.",
     CallBack = function()
@@ -1125,25 +1158,25 @@ AutoFarmTab:Button({
 })
 
 -- Button: Buy Apartment
-AutoFarmTab:Button({
+FarmTab:Button({
     Title = "Buy Apartment -$250",
     Description = "Buys a vacant apartment if available.",
     CallBack = BuyApartment
 })
 
--- Label for guidelines
-AutoFarmTab:Label("Marshmallow guidelines:")
-AutoFarmTab:Label("<font color='rgb(255,0,0)'>Auto Farm can be buggy!</font>")
-AutoFarmTab:Label("1. You can buy apt if you want to but not required.")
-AutoFarmTab:Label("2. Start crouching.")
-AutoFarmTab:Label("3. Run the autofarm.")
-AutoFarmTab:Label("4. Enjoy and relax.")
+-- Label: Guidelines
+FarmTab:Label("Marshmallow guidelines:")
+FarmTab:Label("<font color='rgb(255,0,0)'>Auto Farm can be buggy!</font>")
+FarmTab:Label("1. You can buy apt if you want to but not required.")
+FarmTab:Label("2. Start crouching.")
+FarmTab:Label("3. Run the autofarm.")
+FarmTab:Label("4. Enjoy and relax.")
 
--- Cost label
-local costLabel = AutoFarmTab:Label("You will spend -$190 for 1 marshmallow")
+-- Cost label (akan di-update oleh slider)
+local costLabel = FarmTab:Label("You will spend <font color='rgb(255,0,0)'>-$190</font> for 1 marshmallow")
 
--- Slider for batch amount
-AutoFarmTab:Slider({
+-- Slider: Batch Amount
+FarmTab:Slider({
     Title = "Batch Amount",
     Sliders = {{
         Title = "Amount",
@@ -1158,8 +1191,8 @@ AutoFarmTab:Slider({
     }}
 })
 
--- Toggle for Marshmallow Farm
-AutoFarmTab:Toggle({
+-- Toggle: Marshmallow Farm
+FarmTab:Toggle({
     Title = "Marshmallow Farm <font color='rgb(39,192,80)'>Safe</font>",
     Description = "Automatically buy, cook, and sell marshmallows.",
     Value = false,
@@ -1173,18 +1206,19 @@ AutoFarmTab:Toggle({
     end
 })
 
--- Stats section (using Labels)
-AutoFarmTab:Label("--- Stats ---")
-local statusLabel = AutoFarmTab:Label("Status: <font color='rgb(255,0,0)'>Stopped</font> 🔴")
-local situationLabel = AutoFarmTab:Label("Situation: Water")
-local smallLabel = AutoFarmTab:Label("Small Sold: 0")
-local mediumLabel = AutoFarmTab:Label("Medium Sold: 0")
-local largeLabel = AutoFarmTab:Label("Large Sold: 0")
-local totalSoldLabel = AutoFarmTab:Label("Total Sold: 0")
-local earnedLabel = AutoFarmTab:Label("Session Earned: $0")
-local deathLabel = AutoFarmTab:Label("Deaths: 0")
+-- Stats section (menggunakan Label untuk update real-time)
+FarmTab:Label("--- Stats ---")
+local statusLabel = FarmTab:Label("Status: <font color='rgb(255,0,0)'>Stopped</font> 🔴")
+local situationLabel = FarmTab:Label("Situation: Water")
+local smallLabel = FarmTab:Label("Small Sold: 0")
+local mediumLabel = FarmTab:Label("Medium Sold: 0")
+local largeLabel = FarmTab:Label("Large Sold: 0")
+local totalSoldLabel = FarmTab:Label("Total Sold: 0")
+local earnedLabel = FarmTab:Label("Session Earned: $0")
+local deathLabel = FarmTab:Label("Deaths: 0")
 
 -- Update stats loop
+local Died_Counter = 0
 task.spawn(function()
     while task.wait(1) do
         if Config.AutoFarm.Marshmallow.Enabled then
@@ -1300,7 +1334,5 @@ task.spawn(function()
     end
 end)
 
--- Anti‑AFK status (optional)
--- We can add a label for Anti‑AFK status if needed, but not critical.
-
-Syde:Notify({ Title = "Script", Content = "All systems loaded!", Duration = 5 })
+-- Notifikasi sukses
+Syde:Notify({ Title = "Dilz Farm", Content = "All systems loaded!", Duration = 5 })
