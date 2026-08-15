@@ -43,11 +43,14 @@ local Config = {
 }
 
 -- ===================================================
--- 6. Custom teleport logic (9e9 void method)
+-- 6. Custom teleport logic (X‑axis 9e9 method)
 -- ===================================================
 local function CustomTeleport(targetCFrame)
-    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false end
+    local char = LocalPlayer.Character
+    if not char then return false end
+
+    local rootPart = char:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return false end
 
     local targetPos = targetCFrame.Position
     local maxAttempts = 5
@@ -58,18 +61,16 @@ local function CustomTeleport(targetCFrame)
             return false
         end
 
-        -- Step A: throw to void (9e9)
-        hrp.CFrame = CFrame.new(0, 9e9, 0)
+        -- Step 1: teleport to 9e9 on X axis
+        rootPart.CFrame = CFrame.new(9e9, 0, 0)
+        task.wait(0.5)  -- let engine process
 
-        -- Step B: wait 1‑2 seconds (random)
-        task.wait(math.random(1, 2))
-
-        -- Step C: teleport to target
-        hrp.CFrame = targetCFrame
+        -- Step 2: teleport to final coordinates
+        rootPart.CFrame = targetCFrame
         task.wait(0.5)  -- let physics settle
 
-        -- Step D: verify position
-        local distance = (hrp.Position - targetPos).Magnitude
+        -- Verify position
+        local distance = (rootPart.Position - targetPos).Magnitude
         if distance < 3 then
             return true   -- success
         end
@@ -82,12 +83,6 @@ end
 -- 7. Marshmallow selling logic (no cooking)
 -- ===================================================
 local MarshmallowFarm_Thread = nil
-
-local SellPrices = {
-    ["Small Marshmallow Bag"]  = 1470,
-    ["Medium Marshmallow Bag"] = 2840,
-    ["Large Marshmallow Bag"]  = 4050
-}
 
 local function StartMarshmallowFarm()
     if MarshmallowFarm_Thread then return end
@@ -143,7 +138,6 @@ local function StartMarshmallowFarm()
                                             fireproximityprompt(prompt)
                                         end)
                                         if not fired then
-                                            -- Fallback using VirtualUser
                                             pcall(function()
                                                 game:GetService("VirtualUser"):ClickButton2(Vector2.new())
                                             end)
@@ -165,7 +159,7 @@ local function StartMarshmallowFarm()
                 task.wait(5)
             end
 
-            task.wait(0.5)  -- loop delay
+            task.wait(0.5)
         end
         MarshmallowFarm_Thread = nil
     end)
@@ -201,7 +195,7 @@ FarmTab:Toggle({
 -- Button: Test Teleport
 FarmTab:Button({
     Title = "Test Teleport",
-    Description = "Test the 9e9 void teleport to NPC coordinates (511, 3.6, 601.4).",
+    Description = "Test the X‑axis 9e9 teleport to NPC coordinates (511, 3.6, 601.4).",
     CallBack = function()
         task.spawn(function()
             Syde:Notify({
