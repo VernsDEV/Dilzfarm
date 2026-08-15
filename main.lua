@@ -1,8 +1,7 @@
--- ==========================================
--- DILZ FARM | MARSHMALLOW AUTO FARM SCRIPT
--- ==========================================
+-- // DILZ FARM | MAIN SCRIPT
+-- // Compatible with Syde Library (Source Provided)
 
--- // 1. Services (Using cloneref for anti-cheat evasion)
+-- // 1. SERVICES (Cloneref for AC Evasion)
 local Workspace           = cloneref(game:GetService("Workspace"))
 local Players             = cloneref(game:GetService("Players"))
 local CoreGui             = cloneref(game:GetService("CoreGui"))
@@ -21,13 +20,13 @@ local LocalPlayer         = Players.LocalPlayer
 local Mouse               = LocalPlayer:GetMouse()
 local Camera              = Workspace.CurrentCamera
 
--- // 2. Configuration Table
+-- // 2. CONFIGURATION & STATE
 local Config = {
     ["Functions"] = {};
     ["IsOwned_Bike"] = "...";
     ["AutoFarm"] = {
         ["Running"] = false;
-        ["MovementType"] = "...";
+        ["MovementType"] = "Teleport Mode"; -- Defaulting to TP mode for this script
         ["Marshmallow"] = {
             ["Enabled"] = false;
             ["BatchAmount"] = 1;
@@ -44,12 +43,13 @@ local Config = {
     };
 }
 
--- // 3. UI Initialization (Syde Library)
--- NOTE: Since your repo is private, game:HttpGet will return a 404 error. 
--- To fix this, either authenticate your executor, or paste the raw ui.lua source 
--- code directly into a string and use: local Syde = loadstring(SOURCE_CODE)()
-local Syde = loadstring(game:HttpGet("https://raw.githubusercontent.com/VernsDEV/Dilzfarm/refs/heads/main/ui.lua"))()
+-- // 3. LOAD SYDE LIBRARY
+-- NOTE: Since your repo is private, this URL will 404. 
+-- PASTE THE RAW SOURCE OF ui.lua INTO THE STRING BELOW IF IT FAILS.
+local LibSource = game:HttpGet("https://raw.githubusercontent.com/VernsDEV/Dilzfarm/refs/heads/main/ui.lua")
+local Syde = loadstring(LibSource)()
 
+-- Initialize Loader
 Syde:Load({
     Name = "Dilz Farm",
     Logo = "14554547135", 
@@ -59,17 +59,19 @@ Syde:Load({
     HitBox = Color3.fromRGB(255, 151, 227)
 })
 
+-- Initialize Window
 local Window = Syde:Init({
     Title = "Dilz Farm",
     SubText = "VernsDEV",
-    Home = { Enabled = false }
+    Home = { Enabled = false } -- Skip home page, go straight to tabs
 })
 
+-- Create FARM Tab (Using correct Syde API: InitTab)
 local FarmTab = Window:InitTab({
     Title = "FARM"
 })
 
--- // 4. Custom Teleport Logic
+-- // 4. CUSTOM TELEPORT LOGIC (9e9 Void Check)
 local function CustomTeleport(targetCFrame)
     local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     if not hrp then return false end
@@ -78,31 +80,32 @@ local function CustomTeleport(targetCFrame)
     local maxAttempts = 5
     
     for i = 1, maxAttempts do
-        -- Break if farm is disabled
         if not Config["AutoFarm"]["Marshmallow"]["Enabled"] then return false end
         
-        -- Step A: TP to 9e9 (Void)
+        -- STEP A: TP TO VOID (9e9)
         hrp.CFrame = CFrame.new(0, 9e9, 0)
-        task.wait(math.random(1, 2)) -- Wait 1-2 seconds randomly
         
-        -- Step B: TP to exact target coordinate
+        -- STEP B: WAIT 1-2 SECONDS (RANDOM)
+        task.wait(math.random(1, 2))
+        
+        -- STEP C: TP TO EXACT COORDINATE
         hrp.CFrame = targetCFrame
-        task.wait(0.5) -- Let physics/engine settle
+        task.wait(0.5) -- Allow physics to settle
         
-        -- Step C: Check coordinate
+        -- STEP D: CHECK COORDINATES
         local currentPos = hrp.Position
         local distance = (currentPos - targetPos).Magnitude
         
-        -- If almost exact (within 3 studs), don't try again
-        if distance < 20 then
+        -- If almost exact (< 3 studs), SUCCESS - Don't try again
+        if distance < 3 then
             return true
         end
-        -- If not same, loop continues and tries again
+        -- If not same, loop continues to try again
     end
     return false
 end
 
--- // 5. Marshmallow Farm Logic
+-- // 5. MARSHMALLOW FARM LOGIC
 local MarshmallowFarm_Thread = nil
 local MarshmallowSellPrices = {
     ["Small Marshmallow Bag"]  = 1470;
@@ -115,27 +118,23 @@ local function StartMarshmallowFarm()
     
     MarshmallowFarm_Thread = task.spawn(function()
         while Config["AutoFarm"]["Marshmallow"]["Enabled"] do
-            -- Check if we have marshmallows in inventory to sell
+            -- Check inventory for marshmallows to sell
             local hasMarshmallows = false
-            local backpackItems = LocalPlayer.Backpack:GetChildren()
-            local charItems = LocalPlayer.Character and LocalPlayer.Character:GetChildren() or {}
-            
-            for _, item in ipairs(backpackItems) do
+            for _, item in ipairs(LocalPlayer.Backpack:GetChildren()) do
                 if item.Name:find("Marshmallow Bag") then hasMarshmallows = true break end
             end
-            if not hasMarshmallows then
-                for _, item in ipairs(charItems) do
+            if not hasMarshmallows and LocalPlayer.Character then
+                for _, item in ipairs(LocalPlayer.Character:GetChildren()) do
                     if item.Name:find("Marshmallow Bag") then hasMarshmallows = true break end
                 end
             end
 
             if hasMarshmallows then
-                -- Teleport to exact sell coordinate using custom logic
+                -- Execute Custom TP Logic to Sell NPC
                 local sellCFrame = CFrame.new(511.1, 3.6, 601.4)
                 local success = CustomTeleport(sellCFrame)
                 
                 if success then
-                    -- Interact with Sell NPC (Lamont Bell)
                     local npc = Workspace.Folders.NPCs:FindFirstChild("Lamont Bell")
                     if npc then
                         local prompt = npc.UpperTorso:FindFirstChildOfClass("ProximityPrompt")
@@ -150,7 +149,7 @@ local function StartMarshmallowFarm()
                                     task.wait(0.2)
                                     fireproximityprompt(prompt)
                                     
-                                    -- Update Config Stats
+                                    -- Update Stats
                                     local bagType = item.Name
                                     if Config["AutoFarm"]["Marshmallow"]["Status"]["Sold_Type"][bagType] then
                                         Config["AutoFarm"]["Marshmallow"]["Status"]["Total_Sold"] += 1
@@ -165,10 +164,8 @@ local function StartMarshmallowFarm()
                 end
             else
                 -- ==========================================
-                -- INSERT FULL COOKING/BUYING LOGIC HERE
-                -- (Paste the internal cooking loop from your Main.lua here 
-                -- if you want it to automatically buy ingredients and cook 
-                -- when the backpack is empty)
+                -- INSERT BUYING/COOKING LOGIC HERE
+                -- (When backpack is empty, buy ingredients & cook)
                 -- ==========================================
                 task.wait(1)
             end
@@ -187,7 +184,9 @@ local function StopMarshmallowFarm()
     end
 end
 
--- // 6. UI Elements
+-- // 6. UI ELEMENTS (Strictly using Syde API)
+
+-- Toggle: Auto Farm
 FarmTab:Toggle({
     Title = "Marshmallow Auto Farm",
     Description = "Automatically teleports and sells marshmallows using void TP.",
@@ -202,10 +201,18 @@ FarmTab:Toggle({
     end
 })
 
+-- Button: Test Teleport (NOW VISIBLE & FUNCTIONAL)
 FarmTab:Button({
     Title = "Test Teleport",
-    Description = "Manually test the custom TP logic to 511.1, 3.6, 601.4",
+    Description = "Manually test the custom 9e9 TP logic to 511.1, 3.6, 601.4",
     CallBack = function()
-        CustomTeleport(CFrame.new(511.1, 3.6, 601.4))
+        task.spawn(function()
+            local result = CustomTeleport(CFrame.new(511.1, 3.6, 601.4))
+            if result then
+                Syde:Notify({Title = "TP Success", Content = "Arrived at destination!", Duration = 3})
+            else
+                Syde:Notify({Title = "TP Failed", Content = "Could not reach destination after 5 attempts.", Duration = 3})
+            end
+        end)
     end
 })
