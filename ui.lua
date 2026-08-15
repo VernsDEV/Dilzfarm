@@ -1,5 +1,5 @@
 -- ===================================================
--- ui.lua  --  Dilz Farm Main Module
+-- ui.lua  --  Dilz Farm Main Module (void teleport)
 -- ===================================================
 
 -- 1. Load Syde UI library
@@ -30,8 +30,8 @@ local FarmTab = Window:InitTab({
 -- ===================================================
 -- 5. Services & state
 -- ===================================================
-local Workspace = cloneref(game:GetService("Workspace"))
-local Players   = cloneref(game:GetService("Players"))
+local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 local Config = {
@@ -43,40 +43,71 @@ local Config = {
 }
 
 -- ===================================================
--- 6. Custom teleport logic (X‑axis 9e9 method)
+-- 6. Teleport with void (9e9 on X axis)
 -- ===================================================
 local function CustomTeleport(targetCFrame)
+    -- Get character and root part
     local char = LocalPlayer.Character
-    if not char then return false end
+    if not char then
+        return false, "Character not found"
+    end
 
     local rootPart = char:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return false end
+    if not rootPart then
+        return false, "HumanoidRootPart not found"
+    end
 
     local targetPos = targetCFrame.Position
     local maxAttempts = 5
 
     for attempt = 1, maxAttempts do
-        -- Stop if farm was disabled mid‑attempt
+        -- Stop if farm disabled mid‑attempt
         if not Config.AutoFarm.Marshmallow.Enabled then
-            return false
+            return false, "Farm disabled during attempt"
         end
 
-        -- Step 1: teleport to 9e9 on X axis
-        rootPart.CFrame = CFrame.new(9e9, 0, 0)
-        task.wait(0.5)  -- let engine process
+        -- Re‑fetch character/rootPart in case they changed
+        char = LocalPlayer.Character
+        if not char then
+            return false, "Character lost during attempt"
+        end
+        rootPart = char:FindFirstChild("HumanoidRootPart")
+        if not rootPart then
+            return false, "RootPart lost during attempt"
+        end
 
-        -- Step 2: teleport to final coordinates
-        rootPart.CFrame = targetCFrame
-        task.wait(0.5)  -- let physics settle
+        -- Step 1: Teleport to void (X = 9e9)
+        local voidCF = CFrame.new(9e9, 0, 0)
+        local success, err = pcall(function()
+            rootPart.CFrame = voidCF
+        end)
+        if not success then
+            return false, "Void teleport failed: " .. tostring(err)
+        end
+
+        -- Step 2: Wait for engine to process
+        task.wait(0.5)
+
+        -- Step 3: Teleport to final target
+        success, err = pcall(function()
+            rootPart.CFrame = targetCFrame
+        end)
+        if not success then
+            return false, "Target teleport failed: " .. tostring(err)
+        end
+
+        -- Step 4: Let physics settle
+        task.wait(0.5)
 
         -- Verify position
         local distance = (rootPart.Position - targetPos).Magnitude
         if distance < 3 then
-            return true   -- success
+            return true, "Success on attempt " .. attempt
         end
-        -- otherwise retry
+        -- Otherwise, loop again
     end
-    return false
+
+    return false, "Failed after " .. maxAttempts .. " attempts"
 end
 
 -- ===================================================
@@ -89,76 +120,58 @@ local function StartMarshmallowFarm()
 
     MarshmallowFarm_Thread = task.spawn(function()
         while Config.AutoFarm.Marshmallow.Enabled do
-            -- Check inventory for marshmallow bags
+            -- Check backpack for marshmallow bags
             local hasMarshmallows = false
-            local backpackItems = LocalPlayer.Backpack:GetChildren()
-            for _, item in ipairs(backpackItems) do
+            for _, item in ipairs(LocalPlayer.Backpack:GetChildren()) do
                 if item:IsA("Tool") and item.Name:find("Marshmallow Bag") then
                     hasMarshmallows = true
                     break
                 end
             end
-            if not hasMarshmallows and LocalPlayer.Character then
-                for _, item in ipairs(LocalPlayer.Character:GetChildren()) do
-                    if item:IsA("Tool") and item.Name:find("Marshmallow Bag") then
-                        hasMarshmallows = true
-                        break
-                    end
-                end
-            end
 
             if hasMarshmallows then
-                -- NPC Lamont Bell coordinates
                 local sellCFrame = CFrame.new(511.1, 3.6, 601.4)
-                local success = CustomTeleport(sellCFrame)
-
+                local success, msg = CustomTeleport(sellCFrame)
                 if success then
+                    -- Sell logic
                     local npcFolder = Workspace:FindFirstChild("Folders") and Workspace.Folders:FindFirstChild("NPCs")
                     if npcFolder then
                         local lamont = npcFolder:FindFirstChild("Lamont Bell")
                         if lamont then
                             local prompt = lamont:FindFirstChild("UpperTorso") and lamont.UpperTorso:FindFirstChildOfClass("ProximityPrompt")
                             if prompt then
-                                -- Tweak prompt properties
                                 pcall(function()
                                     prompt.HoldDuration = 0
                                     prompt.RequiresLineOfSight = false
                                 end)
-
-                                -- Sell each marshmallow bag
                                 for _, item in ipairs(LocalPlayer.Backpack:GetChildren()) do
                                     if item:IsA("Tool") and item.Name:find("Marshmallow Bag") then
                                         local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-                                        if hum then
-                                            hum:EquipTool(item)
-                                            task.wait(0.2)
-                                        end
-                                        -- Trigger the prompt
-                                        local fired = pcall(function()
-                                            fireproximityprompt(prompt)
-                                        end)
-                                        if not fired then
-                                            pcall(function()
-                                                game:GetService("VirtualUser"):ClickButton2(Vector2.new())
-                                            end)
-                                        end
+                                        if hum then hum:EquipTool(item) end
+                                        task.wait(0.2)
+                                        pcall(function() fireproximityprompt(prompt) end)
                                         task.wait(0.5)
                                     end
                                 end
                             end
                         end
                     end
+                else
+                    Syde:Notify({
+                        Title = "Teleport Error",
+                        Content = msg or "Unknown",
+                        Duration = 3
+                    })
+                    task.wait(3)
                 end
             else
-                -- No marshmallows → idle (cooking is disabled)
                 Syde:Notify({
                     Title = "Out of Stock",
-                    Content = "No marshmallows found. Cooking is disabled.",
-                    Duration = 3
+                    Content = "No marshmallows to sell.",
+                    Duration = 2
                 })
                 task.wait(5)
             end
-
             task.wait(0.5)
         end
         MarshmallowFarm_Thread = nil
@@ -180,7 +193,7 @@ end
 -- Toggle: Auto Farm
 FarmTab:Toggle({
     Title = "Marshmallow Auto Farm",
-    Description = "Automatically teleport and sell marshmallows (cooking disabled).",
+    Description = "Automatically teleport (with void) and sell marshmallows.",
     Value = false,
     CallBack = function(state)
         Config.AutoFarm.Marshmallow.Enabled = state
@@ -195,7 +208,7 @@ FarmTab:Toggle({
 -- Button: Test Teleport
 FarmTab:Button({
     Title = "Test Teleport",
-    Description = "Test the X‑axis 9e9 teleport to NPC coordinates (511, 3.6, 601.4).",
+    Description = "Test void teleport to NPC (511, 3.6, 601.4).",
     CallBack = function()
         task.spawn(function()
             Syde:Notify({
@@ -203,7 +216,7 @@ FarmTab:Button({
                 Content = "Starting void sequence...",
                 Duration = 2
             })
-            local result = CustomTeleport(CFrame.new(511.1, 3.6, 601.4))
+            local result, msg = CustomTeleport(CFrame.new(511.1, 3.6, 601.4))
             if result then
                 Syde:Notify({
                     Title = "Success",
@@ -213,8 +226,8 @@ FarmTab:Button({
             else
                 Syde:Notify({
                     Title = "Failed",
-                    Content = "Could not reach destination after 5 attempts.",
-                    Duration = 3
+                    Content = msg or "Unknown error",
+                    Duration = 5
                 })
             end
         end)
